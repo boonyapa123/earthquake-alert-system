@@ -18,9 +18,9 @@ class AppConfig {
       case Environment.development:
         return 'http://10.0.2.2:3000/api/v1'; // 10.0.2.2 = localhost สำหรับ Android Emulator
       case Environment.staging:
-        return 'https://staging-api.eqnode.com/api/v1';
+        return 'http://152.42.248.201/api/v1';
       case Environment.production:
-        return 'https://api.eqnode.com/api/v1';
+        return 'http://152.42.248.201/api/v1';
     }
   }
   
@@ -113,11 +113,11 @@ class AppConfig {
   static bool get enableMockData {
     switch (_environment) {
       case Environment.development:
-        return false; // ✅ ปิด Mock Data - ใช้ของจริงทั้งหมด
+        return false; // ✅ ใช้ API จริง - MongoDB พร้อมแล้ว
       case Environment.staging:
-        return false; // Use real data in staging
+        return false; // Use real API
       case Environment.production:
-        return false; // Never use mock data in production
+        return false; // Use real API
     }
   }
   

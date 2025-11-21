@@ -1,52 +1,138 @@
-// User Model
-const { pgPool } = require('../config/database');
+// User Model (MongoDB)
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
+// User Schema
+const userSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true
+  },
+  password: {
+    type: String,
+    required: true
+  },
+  phone: {
+    type: String,
+    required: true
+  },
+  address: {
+    type: String,
+    default: ''
+  },
+  devices: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Device'
+  }],
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+// Create model
+const UserModel = mongoose.model('User', userSchema);
+
+// User class with static methods (compatible with existing code)
 class User {
   static async create({ name, email, password, phone, address }) {
     const hashedPassword = await bcrypt.hash(password, parseInt(process.env.BCRYPT_ROUNDS) || 10);
     
-    const query = `
-      INSERT INTO users (name, email, password, phone, address, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-      RETURNING id, name, email, phone, address, created_at
-    `;
+    const user = new UserModel({
+      name,
+      email,
+      password: hashedPassword,
+      phone,
+      address: address || ''
+    });
     
-    const values = [name, email, hashedPassword, phone, address];
-    const result = await pgPool.query(query, values);
-    return result.rows[0];
+    await user.save();
+    
+    return {
+      id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      address: user.address,
+      created_at: user.createdAt
+    };
   }
 
   static async findByEmail(email) {
-    const query = 'SELECT * FROM users WHERE email = $1';
-    const result = await pgPool.query(query, [email]);
-    return result.rows[0];
+    const user = await UserModel.findOne({ email: email.toLowerCase() });
+    if (!user) return null;
+    
+    return {
+      id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      password: user.password,
+      phone: user.phone,
+      address: user.address,
+      created_at: user.createdAt,
+      updated_at: user.updatedAt
+    };
   }
 
   static async findById(id) {
-    const query = 'SELECT id, name, email, phone, address, created_at, updated_at FROM users WHERE id = $1';
-    const result = await pgPool.query(query, [id]);
-    return result.rows[0];
+    const user = await UserModel.findById(id);
+    if (!user) return null;
+    
+    return {
+      id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      address: user.address,
+      created_at: user.createdAt,
+      updated_at: user.updatedAt
+    };
   }
 
   static async update(id, { name, phone, address }) {
-    const query = `
-      UPDATE users 
-      SET name = $1, phone = $2, address = $3, updated_at = NOW()
-      WHERE id = $4
-      RETURNING id, name, email, phone, address, updated_at
-    `;
+    const user = await UserModel.findByIdAndUpdate(
+      id,
+      { 
+        name, 
+        phone, 
+        address,
+        updatedAt: new Date()
+      },
+      { new: true }
+    );
     
-    const values = [name, phone, address, id];
-    const result = await pgPool.query(query, values);
-    return result.rows[0];
+    if (!user) return null;
+    
+    return {
+      id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      address: user.address,
+      updated_at: user.updatedAt
+    };
   }
 
   static async updatePassword(id, newPassword) {
     const hashedPassword = await bcrypt.hash(newPassword, parseInt(process.env.BCRYPT_ROUNDS) || 10);
     
-    const query = 'UPDATE users SET password = $1, updated_at = NOW() WHERE id = $2';
-    await pgPool.query(query, [hashedPassword, id]);
+    await UserModel.findByIdAndUpdate(id, { 
+      password: hashedPassword,
+      updatedAt: new Date()
+    });
+    
     return true;
   }
 
@@ -55,15 +141,13 @@ class User {
   }
 
   static async delete(id) {
-    const query = 'DELETE FROM users WHERE id = $1';
-    await pgPool.query(query, [id]);
+    await UserModel.findByIdAndDelete(id);
     return true;
   }
 
   static async getDeviceCount(userId) {
-    const query = 'SELECT COUNT(*) as count FROM devices WHERE owner_id = $1';
-    const result = await pgPool.query(query, [userId]);
-    return parseInt(result.rows[0].count);
+    const user = await UserModel.findById(userId);
+    return user ? user.devices.length : 0;
   }
 }
 

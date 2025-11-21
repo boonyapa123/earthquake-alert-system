@@ -1,4 +1,4 @@
-# Flutter specific rules
+# Flutter wrapper
 -keep class io.flutter.app.** { *; }
 -keep class io.flutter.plugin.**  { *; }
 -keep class io.flutter.util.**  { *; }
@@ -6,51 +6,29 @@
 -keep class io.flutter.**  { *; }
 -keep class io.flutter.plugins.**  { *; }
 
-# MQTT Client rules
+# Google Play Core (fix for R8 error)
+-dontwarn com.google.android.play.core.**
+-keep class com.google.android.play.core.** { *; }
+
+# MQTT
 -keep class org.eclipse.paho.** { *; }
 -dontwarn org.eclipse.paho.**
 
-# HTTP client rules
--keep class okhttp3.** { *; }
--keep interface okhttp3.** { *; }
--dontwarn okhttp3.**
+# Firebase
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**
 
-# JSON serialization rules
+# Gson
 -keepattributes Signature
 -keepattributes *Annotation*
+-dontwarn sun.misc.**
 -keep class com.google.gson.** { *; }
+-keep class * implements com.google.gson.TypeAdapter
 -keep class * implements com.google.gson.TypeAdapterFactory
 -keep class * implements com.google.gson.JsonSerializer
 -keep class * implements com.google.gson.JsonDeserializer
 
-# Firebase rules (when implemented)
--keep class com.google.firebase.** { *; }
--dontwarn com.google.firebase.**
-
-# Security rules - keep encryption classes
--keep class javax.crypto.** { *; }
--keep class java.security.** { *; }
-
-# App specific model classes
--keep class com.eqnode.app.models.** { *; }
-
-# Prevent obfuscation of native methods
--keepclasseswithmembernames class * {
-    native <methods>;
-}
-
-# Keep enum classes
--keepclassmembers enum * {
-    public static **[] values();
-    public static ** valueOf(java.lang.String);
-}
-
-# Remove logging in release builds
--assumenosideeffects class android.util.Log {
-    public static boolean isLoggable(java.lang.String, int);
-    public static int v(...);
-    public static int i(...);
-    public static int w(...);
-    public static int d(...);
-    public static int e(...);
-}
+# Keep generic signature of Call, Response (R8 full mode strips signatures from non-kept items)
+-keep,allowobfuscation,allowshrinking interface retrofit2.Call
+-keep,allowobfuscation,allowshrinking class retrofit2.Response
+-keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation

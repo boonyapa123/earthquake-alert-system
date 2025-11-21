@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: eqnode-postgres
+    environment:
+      POSTGRES_DB: eqnode_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MongoDB (for logs - optional)
+  mongodb:
+    image: mongo:7
+    container_name: eqnode-mongodb
+    environment:
+      MONGO_INITDB_DATABASE: eqnode_logs
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  api:
+    build: .
+    container_name: eqnode-api
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: eqnode_dev
+      DB_USER: postgres
+      DB_PASSWORD: postgres123
+      MONGODB_URI: mongodb://mongodb:27017/eqnode_logs
+      JWT_SECRET: your_super_secret_jwt_key_change_this
+      MQTT_BROKER_URL: mqtt://mqtt.uiot.cloud:1883
+      MQTT_USERNAME: ethernet
+      MQTT_PASSWORD: ei8jZz87wx
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    command: npm start
+
+volumes:
+  postgres_data:
+  mongodb_data:

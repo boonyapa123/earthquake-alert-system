@@ -1,0 +1,140 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop, staging ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        channel: 'stable'
+    
+    - name: Install dependencies
+      run: flutter pub get
+    
+    - name: Run tests
+      run: flutter test
+    
+    - name: Analyze code
+      run: flutter analyze
+
+  build-development:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        channel: 'stable'
+    
+    - name: Install dependencies
+      run: flutter pub get
+    
+    - name: Build Development APK
+      run: |
+        flutter build apk --debug \
+          --dart-define=ENVIRONMENT=development \
+          --dart-define=BUILD_NUMBER=${{ github.run_number }}
+    
+    - name: Upload Development APK
+      uses: actions/upload-artifact@v3
+      with:
+        name: development-apk
+        path: build/app/outputs/flutter-apk/app-debug.apk
+
+  build-staging:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/staging'
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        channel: 'stable'
+    
+    - name: Install dependencies
+      run: flutter pub get
+    
+    - name: Build Staging APK
+      run: |
+        flutter build apk --release \
+          --dart-define=ENVIRONMENT=staging \
+          --dart-define=BUILD_NUMBER=${{ github.run_number }}
+    
+    - name: Upload Staging APK
+      uses: actions/upload-artifact@v3
+      with:
+        name: staging-apk
+        path: build/app/outputs/flutter-apk/app-release.apk
+
+  build-production:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.16.0'
+        channel: 'stable'
+    
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+    
+    - name: Install dependencies
+      run: flutter pub get
+    
+    - name: Build Production APK
+      run: |
+        flutter build apk --release \
+          --dart-define=ENVIRONMENT=production \
+          --dart-define=BUILD_NUMBER=${{ github.run_number }} \
+          --obfuscate \
+          --split-debug-info=build/debug-info
+    
+    - name: Build Production App Bundle
+      run: |
+        flutter build appbundle --release \
+          --dart-define=ENVIRONMENT=production \
+          --dart-define=BUILD_NUMBER=${{ github.run_number }} \
+          --obfuscate \
+          --split-debug-info=build/debug-info
+    
+    - name: Upload Production APK
+      uses: actions/upload-artifact@v3
+      with:
+        name: production-apk
+        path: build/app/outputs/flutter-apk/app-release.apk
+    
+    - name: Upload Production App Bundle
+      uses: actions/upload-artifact@v3
+      with:
+        name: production-aab
+        path: build/app/outputs/bundle/release/app-release.aab
+    
+    - name: Upload Debug Symbols
+      uses: actions/upload-artifact@v3
+      with:
+        name: debug-symbols
+        path: build/debug-info/

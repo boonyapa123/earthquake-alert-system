@@ -16,11 +16,11 @@ class AppConfig {
   static String get baseUrl {
     switch (_environment) {
       case Environment.development:
-        return 'http://10.0.2.2:3000/api/v1'; // 10.0.2.2 = localhost สำหรับ Android Emulator
+        return 'http://152.42.248.201:3000/api/v1'; // ใช้ production server สำหรับ APK
       case Environment.staging:
-        return 'http://152.42.248.201/api/v1';
+        return 'http://152.42.248.201:3000/api/v1';
       case Environment.production:
-        return 'http://152.42.248.201/api/v1';
+        return 'http://152.42.248.201:3000/api/v1';
     }
   }
   
@@ -231,11 +231,11 @@ class AppConfig {
   static Duration get apiTimeout {
     switch (_environment) {
       case Environment.development:
-        return const Duration(seconds: 30); // Longer timeout for debugging
+        return const Duration(seconds: 60); // เพิ่ม timeout สำหรับ network ช้า
       case Environment.staging:
-        return const Duration(seconds: 15);
+        return const Duration(seconds: 30);
       case Environment.production:
-        return const Duration(seconds: 10); // Fast timeout for production
+        return const Duration(seconds: 30); // เพิ่ม timeout สำหรับ production
     }
   }
   

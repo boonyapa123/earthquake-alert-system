@@ -5,6 +5,7 @@ import '../services/user_state.dart';
 import '../services/mqtt_manager.dart';
 import '../services/storage_service.dart';
 import '../config/app_config.dart';
+import 'login_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -339,7 +340,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               final userState = Provider.of<UserState>(context, listen: false);
               userState.logout();
               
-              Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                (route) => false,
+              );
             },
             child: Text('ออกจากระบบ', style: TextStyle(color: Colors.red.shade700)),
           ),

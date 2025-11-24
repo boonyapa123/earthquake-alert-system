@@ -32,13 +32,40 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
 
   Future<void> _requestCameraPermission() async {
     final status = await Permission.camera.request();
-    if (status.isDenied) {
+    
+    if (AppConfig.enableDebugLogging) {
+      debugPrint('Camera permission status: $status');
+    }
+    
+    if (status.isDenied || status.isPermanentlyDenied) {
       if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('ต้องการสิทธิ์ใช้กล้องเพื่อสแกน QR Code'),
-            backgroundColor: Colors.red,
+        // แสดง dialog แทน snackbar เพื่อให้เห็นชัดเจน
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('ต้องการสิทธิ์กล้อง'),
+            content: Text(
+              status.isPermanentlyDenied
+                  ? 'กรุณาเปิดสิทธิ์กล้องในการตั้งค่าของแอป'
+                  : 'แอปต้องการสิทธิ์ใช้กล้องเพื่อสแกน QR Code',
+            ),
+            actions: [
+              if (status.isPermanentlyDenied)
+                TextButton(
+                  onPressed: () {
+                    openAppSettings();
+                    Navigator.pop(context);
+                  },
+                  child: const Text('เปิดการตั้งค่า'),
+                ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pop(context);
+                },
+                child: const Text('ปิด'),
+              ),
+            ],
           ),
         );
       }
@@ -182,6 +209,43 @@ class _QRScannerScreenState extends State<QRScannerScreen> {
           MobileScanner(
             controller: cameraController,
             onDetect: _onDetect,
+            errorBuilder: (context, error, child) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        size: 64,
+                        color: Colors.red,
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'ไม่สามารถเปิดกล้องได้',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        error.errorDetails?.message ?? 'กรุณาตรวจสอบสิทธิ์กล้อง',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.grey),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton.icon(
+                        onPressed: () => openAppSettings(),
+                        icon: const Icon(Icons.settings),
+                        label: const Text('เปิดการตั้งค่า'),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
           if (_scanResult.isNotEmpty)
             Positioned(

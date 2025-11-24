@@ -148,7 +148,8 @@ class MqttManager extends ChangeNotifier {
     }
     _connectionState = MqttConnectionState.connected;
     
-    // ใช้ข้อมูลจริงจาก MQTT เท่านั้น - ไม่ใช้ mock data
+    // ใช้ข้อมูลจริงจาก MQTT เท่านั้น
+    // PMAC = Earthquake, TPO = Tilt, PEMS = Tsunami
     
     notifyListeners();
     
@@ -214,22 +215,30 @@ class MqttManager extends ChangeNotifier {
   Future<void> _processRealMqttData(String topic, Map<String, dynamic> data) async {
     // ตรวจสอบประเภทข้อมูลจาก topic
     
-    // 1. ข้อมูลแผ่นดินไหวจาก EQNODE
-    if (topic.contains('/eqdata/')) {
+    // 1. ข้อมูลแผ่นดินไหวจาก EQNODE eqdata
+    if (topic.contains('/eqdata')) {
       await _processEarthquakeData(topic, data);
     }
-    // 2. ข้อมูลจาก simulator
+    // 2. ข้อมูลคลื่นซึนามิจาก EQNODE tsunami
+    else if (topic.contains('/tsunami')) {
+      await _processTsunamiData(topic, data);
+    }
+    // 3. ข้อมูลความเอียงจาก EQNODE tilt
+    else if (topic.contains('/tilt')) {
+      await _processTiltData(topic, data);
+    }
+    // 4. ข้อมูลจาก earthquake topic (simulator หรือ real)
     else if (topic.contains('earthquake/data')) {
       await _processEarthquakeData(topic, data);
     }
-    // 3. ข้อมูลสถานะอุปกรณ์ (ping, status) - ไม่แสดงในหน้า MQTT Real-time
+    // 5. ข้อมูลสถานะอุปกรณ์ (ping, status) - ไม่แสดงในหน้า MQTT Real-time
     else if (topic.contains('/ping/') || topic.contains('/status')) {
       if (AppConfig.enableDebugLogging) {
         final deviceId = data['did'] ?? data['device_id'] ?? 'unknown';
         print('📱 Device status: $deviceId');
       }
     }
-    // 4. ข้อมูลอื่นๆ (PMAC, TPO, TANK, FLOWMETER, etc.) - log เท่านั้น
+    // 6. ข้อมูลอื่นๆ - log เท่านั้น
     else {
       if (AppConfig.enableDebugLogging) {
         print('📨 Other data from: $topic');
@@ -374,8 +383,135 @@ class MqttManager extends ChangeNotifier {
     }
   }
 
-  // --- Mock Data Generation DISABLED ---
-  // ใช้ข้อมูลจริงจาก MQTT เท่านั้น - ไม่มี mock data
+  // --- Process Tsunami Data from MQTT ---
+  Future<void> _processTsunamiData(String topic, Map<String, dynamic> data) async {
+    // ข้อมูลคลื่นซึนามิจาก eqnode.tarita/hub/1/tsunami
+    
+    String deviceId = 'TSU-UNKNOWN';
+    if (data.containsKey('deviceId')) {
+      deviceId = data['deviceId'];
+    } else if (data.containsKey('device_id')) {
+      deviceId = data['device_id'];
+    } else if (data.containsKey('did')) {
+      deviceId = 'TSU-${data['did']}';
+    }
+    
+    // ดึงความสูงคลื่น (wave height)
+    double waveHeight = 0.0;
+    if (data.containsKey('magnitude')) {
+      waveHeight = (data['magnitude'] ?? 0.0).toDouble();
+    } else if (data.containsKey('wave_height')) {
+      waveHeight = (data['wave_height'] ?? 0.0).toDouble();
+    } else if (data.containsKey('height')) {
+      waveHeight = (data['height'] ?? 0.0).toDouble();
+    }
+    
+    // ดึงตำแหน่ง
+    String location = 'Unknown Location';
+    if (data.containsKey('location')) {
+      location = data['location'];
+    } else if (data.containsKey('latitude') && data.containsKey('longitude')) {
+      final lat = data['latitude'];
+      final lon = data['longitude'];
+      location = 'Lat: ${lat.toStringAsFixed(4)}, Lon: ${lon.toStringAsFixed(4)}';
+    }
+    
+    // ดึง Timestamp
+    DateTime timestamp = DateTime.now();
+    if (data.containsKey('timestamp')) {
+      timestamp = DateTime.tryParse(data['timestamp'] ?? '') ?? DateTime.now();
+    } else if (data.containsKey('ts')) {
+      try {
+        timestamp = DateTime.parse(data['ts'].toString().replaceAll(' ', 'T'));
+      } catch (e) {
+        timestamp = DateTime.now();
+      }
+    }
+    
+    // กรองข้อมูลที่มี wave height > 0
+    if (waveHeight > 0.0) {
+      final log = MqttLog(
+        deviceId: deviceId,
+        magnitude: waveHeight,
+        timestamp: timestamp,
+        location: location,
+        type: 'tsunami',
+        ownerId: 'system',
+        sensorType: 'tsunami',
+      );
+      
+      _processLog(log);
+      
+      if (AppConfig.enableDebugLogging) {
+        print('🌊 Tsunami: $deviceId - Wave Height: ${waveHeight.toStringAsFixed(2)}m');
+      }
+    }
+  }
+  
+  // --- Process Tilt Data from MQTT ---
+  Future<void> _processTiltData(String topic, Map<String, dynamic> data) async {
+    // ข้อมูลความเอียงจาก eqnode.tarita/hub/1/tilt
+    
+    String deviceId = 'TILT-UNKNOWN';
+    if (data.containsKey('deviceId')) {
+      deviceId = data['deviceId'];
+    } else if (data.containsKey('device_id')) {
+      deviceId = data['device_id'];
+    } else if (data.containsKey('did')) {
+      deviceId = 'TILT-${data['did']}';
+    }
+    
+    // ดึงมุมเอียง (tilt angle)
+    double tiltAngle = 0.0;
+    if (data.containsKey('magnitude')) {
+      tiltAngle = (data['magnitude'] ?? 0.0).toDouble();
+    } else if (data.containsKey('angle')) {
+      tiltAngle = (data['angle'] ?? 0.0).toDouble();
+    } else if (data.containsKey('tilt')) {
+      tiltAngle = (data['tilt'] ?? 0.0).toDouble();
+    }
+    
+    // ดึงตำแหน่ง
+    String location = 'Unknown Location';
+    if (data.containsKey('location')) {
+      location = data['location'];
+    } else if (data.containsKey('latitude') && data.containsKey('longitude')) {
+      final lat = data['latitude'];
+      final lon = data['longitude'];
+      location = 'Lat: ${lat.toStringAsFixed(4)}, Lon: ${lon.toStringAsFixed(4)}';
+    }
+    
+    // ดึง Timestamp
+    DateTime timestamp = DateTime.now();
+    if (data.containsKey('timestamp')) {
+      timestamp = DateTime.tryParse(data['timestamp'] ?? '') ?? DateTime.now();
+    } else if (data.containsKey('ts')) {
+      try {
+        timestamp = DateTime.parse(data['ts'].toString().replaceAll(' ', 'T'));
+      } catch (e) {
+        timestamp = DateTime.now();
+      }
+    }
+    
+    // กรองข้อมูลที่มี tilt angle > 0
+    if (tiltAngle > 0.0) {
+      final log = MqttLog(
+        deviceId: deviceId,
+        magnitude: tiltAngle,
+        timestamp: timestamp,
+        location: location,
+        type: 'tilt',
+        ownerId: 'system',
+        sensorType: 'tilt',
+      );
+      
+      _processLog(log);
+      
+      if (AppConfig.enableDebugLogging) {
+        print('📐 Tilt: $deviceId - Angle: ${tiltAngle.toStringAsFixed(2)}°');
+      }
+    }
+  }
   
   // Throttling - จำกัดการอัพเดท UI
   DateTime? _lastUiUpdate;

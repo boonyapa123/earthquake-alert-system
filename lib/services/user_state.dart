@@ -35,6 +35,58 @@ class UserState extends ChangeNotifier {
   // Getter สำหรับรายการอุปกรณ์
   List<Map<String, dynamic>> get userDevices => _userDevices;
 
+  // Check if user is already logged in (auto-login)
+  Future<bool> checkLoginStatus() async {
+    try {
+      _setLoading(true);
+      
+      // Check if token exists
+      final token = await ApiService.getToken();
+      if (token == null || token.isEmpty) {
+        if (AppConfig.enableDebugLogging) {
+          print('No token found - user not logged in');
+        }
+        return false;
+      }
+      
+      // Verify token by getting user profile
+      final result = await ApiService.getUserProfile();
+      
+      if (result['success'] && result['user'] != null) {
+        final user = result['user'];
+        _currentUser = UserModel(
+          email: user['email'] ?? '',
+          name: user['name'] ?? '',
+          phone: user['phone'] ?? '',
+        );
+        _isLoggedIn = true;
+        _error = null;
+        
+        // Load user devices
+        await _loadUserDevices();
+        
+        if (AppConfig.enableDebugLogging) {
+          print('Auto-login successful: ${_currentUser?.email}');
+        }
+        
+        return true;
+      } else {
+        // Token invalid or expired
+        await ApiService.clearToken();
+        if (AppConfig.enableDebugLogging) {
+          print('Token invalid - clearing');
+        }
+        return false;
+      }
+    } catch (e) {
+      if (AppConfig.enableDebugLogging) {
+        print('Error checking login status: $e');
+      }
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
 
   void setUser(String email, String name, String phone) {
     _currentUser = UserModel(email: email, name: name, phone: phone);

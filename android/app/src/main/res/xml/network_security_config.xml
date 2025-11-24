@@ -4,5 +4,6 @@
         <domain includeSubdomains="true">mqtt.uiot.cloud</domain>
         <domain includeSubdomains="true">localhost</domain>
         <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">152.42.248.201</domain>
     </domain-config>
 </network-security-config>

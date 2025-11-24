@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'config/app_config.dart';
-import 'screens/login_screen.dart';
+import 'screens/splash_screen.dart';
 import 'services/user_state.dart';
 import 'services/mqtt_manager.dart';
 import 'services/notification_service.dart';
@@ -125,7 +125,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       debugShowCheckedModeBanner: AppConfig.enableDebugLogging,
-      home: const LoginScreen(),
+      home: const SplashScreen(),
     );
   }
 }
